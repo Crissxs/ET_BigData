@@ -59,4 +59,9 @@ def run(argv=None):
     (p
      | 'Read URLs' >> beam.Create(resources)
      | 'Download and Extract Files' >> beam.ParDo(DownloadAndExtractFiles())
-     | 'Write Results' >> beam.io.WriteToText('gs://duoc-red-bucket/results/ou
+     | 'Write Results' >> beam.io.WriteToText('gs://duoc-red-bucket/results/output'))
+
+    p.run().wait_until_finish()
+
+if __name__ == '__main__':
+    run()
