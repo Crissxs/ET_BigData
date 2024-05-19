@@ -1,11 +1,11 @@
 import json
-import os
 import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions, SetupOptions
+from apache_beam.io.http import HttpSource
 from google.cloud import storage
 import zipfile
 import tempfile
-import requests
+import os
 
 class DownloadAndExtractFiles(beam.DoFn):
     def process(self, element):
@@ -50,18 +50,16 @@ def run(argv=None):
 
     input_json = 'gs://duoc-red-bucket/datos_transporte_et.json'
     
-    # Download the JSON file from GCS
-    storage_client = storage.Client()
-    bucket = storage_client.bucket('duoc-red-bucket')
-    blob = bucket.blob('datos_transporte_et.json')
-    data = json.loads(blob.download_as_text())
+    # Read the JSON file from GCS
+    data = p | 'Read JSON' >> beam.io.ReadFromText(input_json)
+    resources = data | 'Extract Resources' >> beam.Map(lambda line: json.loads(line)['result']['resources'])
 
-    resources = data['result']['resources']
-    
-    (p
-     | 'Read URLs' >> beam.Create(resources)
-     | 'Download and Extract Files' >> beam.ParDo(DownloadAndExtractFiles())
-     | 'Write Results' >> beam.io.WriteToText('gs://duoc-red-bucket/results/output'))
+    # Use HttpSource to read data from URLs
+    urls = resources | 'Get URLs' >> beam.Map(lambda resource: resource['url'])
+    downloaded_files = urls | 'Download Files' >> beam.io.Read(HttpSource())
+
+    # Process downloaded files and upload to GCS
+    downloaded_files | 'Process Files' >> beam.ParDo(DownloadAndExtractFiles())
 
     p.run().wait_until_finish()
 
