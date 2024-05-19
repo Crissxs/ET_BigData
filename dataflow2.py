@@ -1,6 +1,6 @@
 import argparse
 import apache_beam as beam
-from apache_beam.options.pipeline_options import PipelineOptions, SetupOptions, StandardOptions
+from apache_beam.options.pipeline_options import PipelineOptions, SetupOptions, StandardOptions, GoogleCloudOptions
 import logging
 import requests
 import zipfile
@@ -73,6 +73,9 @@ def run(argv=None):
     known_args, pipeline_args = parser.parse_known_args(argv)
 
     pipeline_options = PipelineOptions(pipeline_args)
+    pipeline_options.view_as(GoogleCloudOptions).project = 'duocuc-red'
+    pipeline_options.view_as(GoogleCloudOptions).staging_location = 'gs://duoc-red-bucket/staging'
+    pipeline_options.view_as(GoogleCloudOptions).temp_location = 'gs://duoc-red-bucket/temp'
     pipeline_options.view_as(StandardOptions).runner = known_args.runner
     pipeline_options.view_as(SetupOptions).save_main_session = True
 
