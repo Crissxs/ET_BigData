@@ -1,7 +1,7 @@
 import json
 import os
 import apache_beam as beam
-from apache_beam.options.pipeline_options import PipelineOptions, WorkerOptions
+from apache_beam.options.pipeline_options import PipelineOptions, SetupOptions
 from google.cloud import storage
 import zipfile
 import tempfile
@@ -44,8 +44,8 @@ class DownloadAndExtractFiles(beam.DoFn):
 
 def run(argv=None):
     pipeline_options = PipelineOptions(argv)
-    worker_options = pipeline_options.view_as(WorkerOptions)
-    worker_options.setup_file = 'gs://duoc-red-bucket/requirements.txt'
+    setup_options = pipeline_options.view_as(SetupOptions)
+    setup_options.extra_packages = ['requests']
     p = beam.Pipeline(options=pipeline_options)
 
     input_json = 'gs://duoc-red-bucket/datos_transporte_et.json'
