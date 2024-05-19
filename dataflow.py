@@ -3,7 +3,6 @@ import requests
 import os
 import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions
-from apache_beam.io.gcp.gcsio import GcsIO
 from google.cloud import storage
 import zipfile
 import tempfile
@@ -47,12 +46,12 @@ def run(argv=None):
     pipeline_options = PipelineOptions(argv)
     p = beam.Pipeline(options=pipeline_options)
 
-    input_json = 'gs://duoc-red-bucket/data.json'
+    input_json = 'gs://duoc-red-bucket/datos_transporte_et.json'
     
     # Download the JSON file from GCS
     storage_client = storage.Client()
     bucket = storage_client.bucket('duoc-red-bucket')
-    blob = bucket.blob('data.json')
+    blob = bucket.blob('datos_transporte_et.json')
     data = json.loads(blob.download_as_text())
 
     resources = data['result']['resources']
@@ -60,9 +59,4 @@ def run(argv=None):
     (p
      | 'Read URLs' >> beam.Create(resources)
      | 'Download and Extract Files' >> beam.ParDo(DownloadAndExtractFiles())
-     | 'Write Results' >> beam.io.WriteToText('gs://duoc-red-bucket/results/output'))
-
-    p.run().wait_until_finish()
-
-if __name__ == '__main__':
-    run()
+     | 'Write Results' >> beam.io.WriteToText('gs://duoc-red-bucket/results/ou
