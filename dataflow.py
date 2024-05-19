@@ -1,11 +1,11 @@
 import json
-import requests
 import os
 import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions
 from google.cloud import storage
 import zipfile
 import tempfile
+import requests
 
 class DownloadAndExtractFiles(beam.DoFn):
     def process(self, element):
@@ -44,6 +44,8 @@ class DownloadAndExtractFiles(beam.DoFn):
 
 def run(argv=None):
     pipeline_options = PipelineOptions(argv)
+    worker_options = pipeline_options.view_as(WorkerOptions)
+    worker_options.setup_file = 'gs://duoc-red-bucket/requirements.txt'
     p = beam.Pipeline(options=pipeline_options)
 
     input_json = 'gs://duoc-red-bucket/datos_transporte_et.json'
