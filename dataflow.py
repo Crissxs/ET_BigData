@@ -1,7 +1,7 @@
 import json
 import os
 import apache_beam as beam
-from apache_beam.options.pipeline_options import PipelineOptions
+from apache_beam.options.pipeline_options import PipelineOptions, WorkerOptions
 from google.cloud import storage
 import zipfile
 import tempfile
