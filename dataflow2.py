@@ -1,13 +1,19 @@
 import argparse
-import json
 import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions, SetupOptions, StandardOptions
 import logging
+import requests
 import zipfile
 import io
 import os
+import json
 from apache_beam.io.gcp.gcsio import GcsIO
-import requests
+
+class ParseJsonFn(beam.DoFn):
+    def process(self, element):
+        data = json.loads(element)
+        for entry in data:
+            yield (entry['url'], entry['file_name_prefix'])
 
 class DownloadZip(beam.DoFn):
     def process(self, element):
@@ -58,22 +64,24 @@ class SaveExtractedFileToGCS(beam.DoFn):
 
 def run(argv=None):
     parser = argparse.ArgumentParser()
+    parser.add_argument('--project', dest='project', required=True, help='GCP project ID.')
+    parser.add_argument('--runner', dest='runner', required=True, help='DataflowRunner.')
+    parser.add_argument('--staging_location', dest='staging_location', required=True, help='Staging location.')
+    parser.add_argument('--temp_location', dest='temp_location', required=True, help='Temp location.')
     parser.add_argument('--output_prefix', dest='output_prefix', required=True, help='Output directory prefix to save files.')
+    parser.add_argument('--input_file', dest='input_file', required=True, help='Input JSON file containing URLs and file name prefixes.')
     known_args, pipeline_args = parser.parse_known_args(argv)
 
     pipeline_options = PipelineOptions(pipeline_args)
-    pipeline_options.view_as(StandardOptions).runner = 'DataflowRunner'
+    pipeline_options.view_as(StandardOptions).runner = known_args.runner
     pipeline_options.view_as(SetupOptions).save_main_session = True
 
     with beam.Pipeline(options=pipeline_options) as p:
-        # Leer el archivo de entrada con URLs y prefijos de nombres de archivos
+        # Leer el archivo JSON de entrada con URLs y prefijos de nombres de archivos
         file_data = (
             p
-            | 'CreateInputData' >> beam.Create([
-                ('http://example.com/file1.zip', 'file1'),
-                ('http://example.com/file2.zip', 'file2'),
-                # Agrega más tuplas de URL y prefijo de nombre de archivo según sea necesario
-            ])
+            | 'ReadInputJson' >> beam.io.ReadFromText(known_args.input_file)
+            | 'ParseJson' >> beam.ParDo(ParseJsonFn())
         )
         
         # Descargar archivos ZIP
