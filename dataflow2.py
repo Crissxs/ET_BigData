@@ -11,12 +11,10 @@ import argparse
 
 class ExtractUrlsAndNames(beam.DoFn):
     def process(self, element):
-        ruta = element
-        with open(ruta) as contenido:
-            datos = json.load(contenido)
-            for resource in datos['result']['resources']:
-                if 'url' in resource and 'name' in resource:
-                    yield (resource['url'], resource['name'])
+        data = json.loads(element)
+        for item in data:
+            if 'url' in item and 'name' in item:
+                yield (item['url'], item['name'])
 
 class DownloadZip(beam.DoFn):
     def process(self, element):
@@ -68,7 +66,7 @@ class SaveExtractedFileToGCS(beam.DoFn):
 def run(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--output_prefix', dest='output_prefix', required=True, help='Output directory prefix to save files.')
-    parser.add_argument('--input_file', dest='input_file', default='gs://duoc-red-bucket/datos_transporte_et.json', help='Input file containing URLs and file name prefixes.')
+    parser.add_argument('--input_file', dest='input_file', required=True, help='Input file containing URLs and file name prefixes.')
     known_args, pipeline_args = parser.parse_known_args(argv)
 
     pipeline_options = PipelineOptions(pipeline_args)
@@ -82,15 +80,16 @@ def run(argv=None):
     google_cloud_options.temp_location = 'gs://duoc-red-bucket/temp'
 
     with beam.Pipeline(options=pipeline_options) as p:
-        # Leer el archivo de entrada y extraer las URLs y nombres
-        urls_and_names = (
+        # Leer el archivo de entrada con URLs y prefijos de nombres de archivos
+        file_data = (
             p
-            | 'ExtractUrlsAndNames' >> beam.ParDo(ExtractUrlsAndNames())
+            | 'ReadInputFile' >> beam.io.ReadFromText(known_args.input_file)
+            | 'ExtractUrlsAndNames' >> beam.ParDo(ExtractUrlsAndNames())  # Extraer las URLs y nombres del JSON
         )
         
         # Descargar archivos ZIP
         downloaded_files = (
-            urls_and_names
+            file_data
             | 'DownloadZip' >> beam.ParDo(DownloadZip())
             | 'SaveZipToGCS' >> beam.ParDo(SaveZipToGCS(known_args.output_prefix))
         )
@@ -101,7 +100,6 @@ def run(argv=None):
             | 'ExtractZip' >> beam.ParDo(ExtractZip())
             | 'SaveExtractedFileToGCS' >> beam.ParDo(SaveExtractedFileToGCS(known_args.output_prefix))
         )
-        _ = extracted_files | 'PrintExtractedFileNames' >> beam.Map(print)
 
 if __name__ == '__main__':
     logging.getLogger().setLevel(logging.INFO)
