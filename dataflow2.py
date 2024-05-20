@@ -17,18 +17,18 @@ class ExtractUrls(beam.DoFn):
 
 class DownloadZip(beam.DoFn):
     def process(self, element):
-        url, file_name_prefix = element
+        url = element
         response = requests.get(url)
         response.raise_for_status()
-        yield (file_name_prefix, response.content)
+        yield (response.content)
 
 class SaveZipToGCS(beam.DoFn):
     def __init__(self, output_prefix):
         self.output_prefix = output_prefix
 
     def process(self, element):
-        file_name_prefix, content = element
-        file_path = f'{self.output_prefix}/{file_name_prefix}.zip'
+        content = element
+        file_path = f'{self.output_prefix}.zip'
         gcs = GcsIO()
         if not gcs.exists(file_path):  # Check if file already exists
             with gcs.open(file_path, 'wb') as f:
@@ -55,8 +55,8 @@ class SaveExtractedFileToGCS(beam.DoFn):
         self.output_prefix = output_prefix
 
     def process(self, element):
-        file_name, content = element
-        file_path = f'{self.output_prefix}/{file_name}'
+        content = element
+        file_path = f'{self.output_prefix}'
         gcs = GcsIO()
         with gcs.open(file_path, 'wb') as f:
             f.write(content)
