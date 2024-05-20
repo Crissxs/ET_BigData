@@ -88,17 +88,14 @@ def run(argv=None):
             | 'ReadInputFile' >> beam.Create([known_args.input_file])
             | 'ExtractUrlsAndNames' >> beam.ParDo(ExtractUrlsAndNames())
         )
-
-        # Aplicar una ventana global a todos los elementos
-        urls_and_names = urls_and_names | beam.WindowInto(beam.window.GlobalWindows())
-
+        
         # Descargar archivos ZIP
         downloaded_files = (
             urls_and_names
             | 'DownloadZip' >> beam.ParDo(DownloadZip())
             | 'SaveZipToGCS' >> beam.ParDo(SaveZipToGCS(known_args.output_prefix))
         )
-
+        
         # Extraer archivos TXT de los ZIP descargados
         extracted_files = (
             downloaded_files
