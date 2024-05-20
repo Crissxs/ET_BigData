@@ -9,13 +9,6 @@ import json
 from apache_beam.io.gcp.gcsio import GcsIO
 import argparse
 
-class ReadInputFile(beam.DoFn):
-    def process(self, element):
-        gcs = GcsIO()
-        with gcs.open(element) as f:
-            data = f.read().decode('utf-8')
-            for line in data.split('\n'):
-                yield line.strip()
 class ExtractUrlsAndNames(beam.DoFn):
     def process(self, element):
         ruta = element
@@ -89,20 +82,14 @@ def run(argv=None):
     google_cloud_options.temp_location = 'gs://duoc-red-bucket/temp'
 
     with beam.Pipeline(options=pipeline_options) as p:
-        # Leer el archivo de entrada y extraer las URLs y nombres
-        urls_and_names = (
-            p
-            | 'ReadInputFile' >> beam.ParDo(ReadInputFile())
-            | 'ExtractUrlsAndNames' >> beam.ParDo(ExtractUrlsAndNames())
-        )
-        
         # Descargar archivos ZIP
         downloaded_files = (
-            urls_and_names
+            p
+            | 'ExtractUrlsAndNames' >> beam.ParDo(ExtractUrlsAndNames())
             | 'DownloadZip' >> beam.ParDo(DownloadZip())
             | 'SaveZipToGCS' >> beam.ParDo(SaveZipToGCS(known_args.output_prefix))
         )
-        
+
         # Extraer archivos TXT de los ZIP descargados
         extracted_files = (
             downloaded_files
