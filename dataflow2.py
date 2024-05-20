@@ -68,7 +68,7 @@ class SaveExtractedFileToGCS(beam.DoFn):
 def run(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--output_prefix', dest='output_prefix', required=True, help='Output directory prefix to save files.')
-    parser.add_argument('--input_file', dest='input_file', required=True, help='Input file containing URLs and file name prefixes.')
+    parser.add_argument('--input_file', dest='input_file', default='gs://duoc-red-bucket/datos_transporte_et.json', help='Input file containing URLs and file name prefixes.')
     known_args, pipeline_args = parser.parse_known_args(argv)
 
     pipeline_options = PipelineOptions(pipeline_args)
@@ -85,7 +85,6 @@ def run(argv=None):
         # Leer el archivo de entrada y extraer las URLs y nombres
         urls_and_names = (
             p
-            | 'ReadInputFile' >> beam.Create([known_args.input_file])
             | 'ExtractUrlsAndNames' >> beam.ParDo(ExtractUrlsAndNames())
         )
         
