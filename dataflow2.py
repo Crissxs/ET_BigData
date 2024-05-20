@@ -82,10 +82,19 @@ def run(argv=None):
     google_cloud_options.temp_location = 'gs://duoc-red-bucket/temp'
 
     with beam.Pipeline(options=pipeline_options) as p:
+        # Leer el archivo de entrada y extraer las URLs y nombres
+        urls_and_names = (
+            p
+            | 'ReadInputFile' >> beam.Create([known_args.input_file])
+            | 'ExtractUrlsAndNames' >> beam.ParDo(ExtractUrlsAndNames())
+        )
+
+        # Aplicar una ventana global a todos los elementos
+        urls_and_names = urls_and_names | beam.WindowInto(beam.window.GlobalWindows())
+
         # Descargar archivos ZIP
         downloaded_files = (
-            p
-            | 'ExtractUrlsAndNames' >> beam.ParDo(ExtractUrlsAndNames())
+            urls_and_names
             | 'DownloadZip' >> beam.ParDo(DownloadZip())
             | 'SaveZipToGCS' >> beam.ParDo(SaveZipToGCS(known_args.output_prefix))
         )
