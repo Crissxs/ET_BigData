@@ -102,6 +102,7 @@ def run(argv=None):
             | 'ExtractZip' >> beam.ParDo(ExtractZip())
             | 'SaveExtractedFileToGCS' >> beam.ParDo(SaveExtractedFileToGCS(known_args.output_prefix))
         )
+        _ = extracted_files | 'PrintExtractedFileNames' >> beam.Map(print)
 
 if __name__ == '__main__':
     logging.getLogger().setLevel(logging.INFO)
