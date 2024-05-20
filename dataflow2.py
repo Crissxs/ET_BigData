@@ -11,16 +11,18 @@ import argparse
 
 class ExtractUrls(beam.DoFn):
     def process(self, element):
-        data = json.loads(element)
-        for resource in data['result']['resources']:
-            yield resource['url']
+        gcs = GcsIO()
+        with gcs.open(element, 'r') as f:
+            data = json.load(f)
+            for resource in data['result']['resources']:
+                yield resource['url']
 
 class DownloadZip(beam.DoFn):
     def process(self, element):
         url = element
         response = requests.get(url)
         response.raise_for_status()
-        yield (response.content)
+        yield response.content
 
 class SaveZipToGCS(beam.DoFn):
     def __init__(self, output_prefix):
@@ -28,7 +30,8 @@ class SaveZipToGCS(beam.DoFn):
 
     def process(self, element):
         content = element
-        file_path = f'{self.output_prefix}.zip'
+        file_name = os.path.basename(element).split('?')[0]  # Extract file name from URL
+        file_path = f'{self.output_prefix}/{file_name}.zip'
         gcs = GcsIO()
         if not gcs.exists(file_path):  # Check if file already exists
             with gcs.open(file_path, 'wb') as f:
@@ -55,8 +58,8 @@ class SaveExtractedFileToGCS(beam.DoFn):
         self.output_prefix = output_prefix
 
     def process(self, element):
-        content = element
-        file_path = f'{self.output_prefix}'
+        file_name, content = element
+        file_path = f'{self.output_prefix}/{file_name}'
         gcs = GcsIO()
         with gcs.open(file_path, 'wb') as f:
             f.write(content)
@@ -65,7 +68,7 @@ class SaveExtractedFileToGCS(beam.DoFn):
 def run(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--output_prefix', dest='output_prefix', required=True, help='Output directory prefix to save files.')
-    parser.add_argument('--input_file', dest='input_file', required=True, help='Input file containing URLs and file name prefixes.')
+    parser.add_argument('--input_file', dest='input_file', required=True, help='Input file containing URLs.')
     known_args, pipeline_args = parser.parse_known_args(argv)
 
     pipeline_options = PipelineOptions(pipeline_args)
@@ -79,11 +82,11 @@ def run(argv=None):
     google_cloud_options.temp_location = 'gs://duoc-red-bucket/temp'
 
     with beam.Pipeline(options=pipeline_options) as p:
-        # Leer el archivo de entrada con URLs y prefijos de nombres de archivos
+        # Leer el archivo de entrada con URLs desde GCS y extraer las URLs
         file_data = (
             p
-            | 'ReadInputFile' >> beam.io.ReadFromText(known_args.input_file)
-            | 'ExtractUrls' >> beam.ParDo(ExtractUrls())  # Extraer las URLs y nombres del JSON
+            | 'ReadInputFile' >> beam.Create([known_args.input_file])
+            | 'ExtractUrls' >> beam.ParDo(ExtractUrls())
         )
         
         # Descargar archivos ZIP
@@ -99,7 +102,7 @@ def run(argv=None):
             | 'ExtractZip' >> beam.ParDo(ExtractZip())
             | 'SaveExtractedFileToGCS' >> beam.ParDo(SaveExtractedFileToGCS(known_args.output_prefix))
         )
-    
+
 if __name__ == '__main__':
     logging.getLogger().setLevel(logging.INFO)
     run()
