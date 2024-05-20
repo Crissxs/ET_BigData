@@ -11,10 +11,12 @@ import argparse
 
 class ExtractUrlsAndNames(beam.DoFn):
     def process(self, element):
-        data = json.loads(element)
-        for item in data:
-            if 'url' in item and 'name' in item:
-                yield (item['url'], item['name'])
+        ruta = element
+        with open(ruta) as contenido:
+            datos = json.load(contenido)
+            for resource in datos['result']['resources']:
+                if 'url' in resource and 'name' in resource:
+                    yield (resource['url'], resource['name'])
 
 class DownloadZip(beam.DoFn):
     def process(self, element):
@@ -80,16 +82,16 @@ def run(argv=None):
     google_cloud_options.temp_location = 'gs://duoc-red-bucket/temp'
 
     with beam.Pipeline(options=pipeline_options) as p:
-        # Leer el archivo de entrada con URLs y prefijos de nombres de archivos
-        file_data = (
+        # Leer el archivo de entrada y extraer las URLs y nombres
+        urls_and_names = (
             p
-            | 'ReadInputFile' >> beam.io.ReadFromText(known_args.input_file)
-            | 'ExtractUrlsAndNames' >> beam.ParDo(ExtractUrlsAndNames())  # Extraer las URLs y nombres del JSON
+            | 'ReadInputFile' >> beam.Create([known_args.input_file])
+            | 'ExtractUrlsAndNames' >> beam.ParDo(ExtractUrlsAndNames())
         )
         
         # Descargar archivos ZIP
         downloaded_files = (
-            file_data
+            urls_and_names
             | 'DownloadZip' >> beam.ParDo(DownloadZip())
             | 'SaveZipToGCS' >> beam.ParDo(SaveZipToGCS(known_args.output_prefix))
         )
