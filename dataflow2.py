@@ -9,6 +9,13 @@ import json
 from apache_beam.io.gcp.gcsio import GcsIO
 import argparse
 
+class ReadInputFile(beam.DoFn):
+    def process(self, element):
+        gcs = GcsIO()
+        with gcs.open(element) as f:
+            data = f.read().decode('utf-8')
+            for line in data.split('\n'):
+                yield line.strip()
 class ExtractUrlsAndNames(beam.DoFn):
     def process(self, element):
         ruta = element
@@ -85,7 +92,7 @@ def run(argv=None):
         # Leer el archivo de entrada y extraer las URLs y nombres
         urls_and_names = (
             p
-            | 'ReadInputFile' >> beam.Create([known_args.input_file])
+            | 'ReadInputFile' >> beam.ParDo(ReadInputFile())
             | 'ExtractUrlsAndNames' >> beam.ParDo(ExtractUrlsAndNames())
         )
         
