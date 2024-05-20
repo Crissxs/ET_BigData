@@ -9,12 +9,11 @@ import json
 from apache_beam.io.gcp.gcsio import GcsIO
 import argparse
 
-class ExtractUrlsAndNames(beam.DoFn):
+class ExtractUrls(beam.DoFn):
     def process(self, element):
         data = json.loads(element)
-        for item in data:
-            if 'url' in item and 'name' in item:
-                yield (item['url'], item['name'])
+        for resource in data['result']['resources']:
+            yield resource['url']
 
 class DownloadZip(beam.DoFn):
     def process(self, element):
@@ -84,7 +83,7 @@ def run(argv=None):
         file_data = (
             p
             | 'ReadInputFile' >> beam.io.ReadFromText(known_args.input_file)
-            | 'ExtractUrlsAndNames' >> beam.ParDo(ExtractUrlsAndNames())  # Extraer las URLs y nombres del JSON
+            | 'ExtractUrls' >> beam.ParDo(ExtractUrls())  # Extraer las URLs y nombres del JSON
         )
         
         # Descargar archivos ZIP
