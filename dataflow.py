@@ -3,7 +3,7 @@ from apache_beam.options.pipeline_options import PipelineOptions, SetupOptions, 
 import logging
 import requests
 from apache_beam.io.gcp.gcsio import GcsIO
-
+from apache_beam.transforms.window import FixedWindows
 class ExtractUrls(beam.DoFn):
     def process(self, element):
         response = requests.get("https://us-central1-duoc-bigdata-sc-2023-01-01.cloudfunctions.net/datos_transporte_et")
@@ -50,8 +50,9 @@ def run(argv=None):
 
     with beam.Pipeline(options=pipeline_options) as p:
         # Obtener las URLs directamente del endpoint
-        urls = p | 'ExtractUrls' >> beam.ParDo(ExtractUrls())
-
+        urls = p | 'ExtractUrls' >> beam.ParDo(ExtractUrls()) \
+                 | 'ReadFromSource' >> beam.io.Read(beam.io.GenerateSequence(0, 1)) \
+                 | 'WithFixedWindow' >> beam.WindowInto(FixedWindows(60))
         # Descargar archivos ZIP
         downloaded_files = (
             urls | 'DownloadZip' >> beam.ParDo(DownloadZip())
