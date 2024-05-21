@@ -5,7 +5,6 @@ import requests
 import zipfile
 import io
 import os
-import json
 from apache_beam.io.gcp.gcsio import GcsIO
 import argparse
 
@@ -27,15 +26,16 @@ class DownloadZip(beam.DoFn):
         url = element
         response = requests.get(url)
         response.raise_for_status()
-        yield response.content
+        yield response.content, url  # Devolver también la URL
 
 class SaveZipToGCS(beam.DoFn):
     def __init__(self, output_prefix):
         self.output_prefix = output_prefix
 
     def process(self, element):
-        content = element
-        file_path = f'{self.output_prefix}.zip'
+        content, url = element
+        file_name = os.path.basename(url) + '.zip'
+        file_path = f'{self.output_prefix}/{file_name}'
         gcs = GcsIO()
         if not gcs.exists(file_path):  # Check if file already exists
             with gcs.open(file_path, 'wb') as f:
@@ -69,7 +69,7 @@ class SaveExtractedFileToGCS(beam.DoFn):
         with gcs.open(file_path, 'wb') as f:
             f.write(content)
         yield file_path
-        
+
 def run(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--output_prefix', dest='output_prefix', required=True, help='Output directory prefix to save files.')
