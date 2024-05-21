@@ -13,11 +13,11 @@ class ExtractUrls(beam.DoFn):
     def process(self, element):
         data = json.loads(element)
         for resource in data['result']['resources']:
-            yield resource['url']
+            yield resource['url'], resource['name']  # Emitir la URL y el nombre de descarga
 
 class DownloadZip(beam.DoFn):
     def process(self, element):
-        url, download_name = element  # Agregar el nombre de la descarga
+        url, download_name = element
         response = requests.get(url)
         response.raise_for_status()
         yield response.content, download_name  # Emitir el contenido del archivo y el nombre de la descarga
@@ -27,40 +27,44 @@ class SaveZipToGCS(beam.DoFn):
         self.output_prefix = output_prefix
 
     def process(self, element):
-        content, download_name = element  # Agregar el nombre de la descarga
-        file_path = f'{self.output_prefix}/{download_name}.zip'  # Usar el nombre de la descarga en el camino del archivo
+        content, download_name = element
+        file_path = f'{self.output_prefix}/{download_name}.zip'
         gcs = GcsIO()
-        if not gcs.exists(file_path):  # Check if file already exists
+        if not gcs.exists(file_path):
             with gcs.open(file_path, 'wb') as f:
                 f.write(content)
-            yield file_path
+            yield file_path, download_name  # Emitir el camino del archivo y el nombre de la descarga
         else:
             logging.info(f"File {file_path} already exists, skipping download.")
-            yield file_path
+            yield file_path, download_name  # Emitir el camino del archivo y el nombre de la descarga
 
 class ExtractZip(beam.DoFn):
     def process(self, element):
         gcs = GcsIO()
-        file_path, download_name = element  # Agregar el nombre de la descarga
+        file_path, download_name = element
         with gcs.open(file_path, 'rb') as f:
             content = f.read()
             with zipfile.ZipFile(io.BytesIO(content)) as z:
                 for zip_info in z.infolist():
                     if zip_info.filename.endswith('.txt'):
                         with z.open(zip_info) as file:
-                            yield (file_info.filename, file.read(), download_name)  # Emitir el nombre del archivo, su contenido y el nombre de la descarga
+                            yield zip_info.filename, file.read(), download_name  # Emitir el nombre del archivo, su contenido y el nombre de la descarga
 
 class SaveExtractedFileToGCS(beam.DoFn):
     def __init__(self, output_prefix):
         self.output_prefix = output_prefix
 
     def process(self, element):
-        file_name, content, download_name = element  # Agregar el nombre de la descarga
-        file_path = f'{self.output_prefix}/{download_name}/{file_name}'  # Usar el nombre de la descarga en el camino del archivo
+        file_name, content, download_name = element
+        folder_path = f'{self.output_prefix}/{download_name}'
+        file_path = f'{folder_path}/{file_name}'
         gcs = GcsIO()
+        if not gcs.exists(folder_path):
+            gcs.makedirs(folder_path)  # Crear la carpeta si no existe
         with gcs.open(file_path, 'wb') as f:
             f.write(content)
-        yield file_path
+        yield file_path, download_name  # Emitir el camino del archivo y el nombre de la descarga
+
 
 def run(argv=None):
     parser = argparse.ArgumentParser()
