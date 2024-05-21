@@ -10,11 +10,11 @@ from apache_beam.io.gcp.gcsio import GcsIO
 import argparse
 
 class ExtractUrls(beam.DoFn):
-        def process(self, element):
-            data = json.loads(element)
-            resources = data['result']['resources']
-            for resource in resources:
-                yield resource['url']
+    def process(self, element):
+        data = json.loads(element)
+        resources = data['result']['resources']
+        for resource in resources:
+            yield resource['url']
 
 class DownloadZip(beam.DoFn):
     def process(self, element):
