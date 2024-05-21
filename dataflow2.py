@@ -56,9 +56,8 @@ class SaveExtractedFileToGCS(beam.DoFn):
         self.output_prefix = output_prefix
 
     def process(self, element):
-        file_name, content = element
-        downloaded_file_name = file_name.split('_')[0]  # Extraer el nombre del archivo descargado
-        file_path = f'{self.output_prefix}/{downloaded_file_name}/{file_name}'  # Agregar el nombre del archivo descargado como una carpeta adicional
+        content = element
+        file_path = f'{self.output_prefix}/{os.path.basename(file_path)}'  # Agregar el nombre del archivo descargado como una carpeta adicional
         gcs = GcsIO()
         with gcs.open(file_path, 'wb') as f:
             f.write(content)
