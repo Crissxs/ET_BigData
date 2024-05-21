@@ -57,7 +57,7 @@ class SaveExtractedFileToGCS(beam.DoFn):
 
     def process(self, element):
         file_name, content, zip_file_name = element
-        extracted_folder = os.path.splitext(zip_file_name)[0]  # Obtener el nombre del archivo ZIP sin la extensión
+        extracted_folder = os.path.splitext(os.path.basename(zip_file_name))[0]  # Obtener el nombre del archivo ZIP sin la extensión
         file_path = f'{self.output_prefix}/{extracted_folder}/{file_name}'
         gcs = GcsIO()
         with gcs.open(file_path, 'wb') as f:
