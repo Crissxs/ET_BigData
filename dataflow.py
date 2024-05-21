@@ -6,7 +6,6 @@ import logging
 
 class ExtractUrls(beam.DoFn):
     def process(self, element):
-        # Obtener las URLs directamente del endpoint
         response = requests.get("https://us-central1-duoc-bigdata-sc-2023-01-01.cloudfunctions.net/datos_transporte_et")
         response.raise_for_status()
         data = response.json()
@@ -20,14 +19,9 @@ class DownloadAndSaveZip(beam.DoFn):
         self.output_bucket = output_bucket
 
     def process(self, url):
-        # Descargar el archivo ZIP desde la URL
         response = requests.get(url)
         response.raise_for_status()
-
-        # Obtener el nombre del archivo ZIP desde la URL
         zip_filename = url.split('/')[-1]
-
-        # Guardar el archivo ZIP en Google Cloud Storage
         gcs = GcsIO()
         output_path = f"{self.output_bucket}/{zip_filename}"
         if not gcs.exists(output_path):
@@ -42,18 +36,15 @@ def run():
     pipeline_options = PipelineOptions()
     pipeline_options.view_as(StandardOptions).runner = 'DataflowRunner'
 
-    # Opciones de Google Cloud
     google_cloud_options = pipeline_options.view_as(GoogleCloudOptions)
     google_cloud_options.project = 'duocuc-red'
     google_cloud_options.region = 'us-central1'
     google_cloud_options.staging_location = 'gs://duoc-red-bucket/staging'
     google_cloud_options.temp_location = 'gs://duoc-red-bucket/temp'
 
-    # Definir el bucket de salida
     output_bucket = 'gs://duoc-red-bucket/Datos_Historicos'
 
     with beam.Pipeline(options=pipeline_options) as p:
-        # Obtener las URLs y descargar/guardar los archivos ZIP
         urls = p | 'Extract URLs' >> beam.ParDo(ExtractUrls())
         _ = urls | 'Download and Save ZIP' >> beam.ParDo(DownloadAndSaveZip(output_bucket))
 
