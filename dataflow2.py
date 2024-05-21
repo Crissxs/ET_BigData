@@ -17,18 +17,18 @@ class ExtractUrls(beam.DoFn):
 
 class DownloadZip(beam.DoFn):
     def process(self, element):
-        url = element
+        url, download_name = element  # Agregar el nombre de la descarga
         response = requests.get(url)
         response.raise_for_status()
-        yield response.content
+        yield response.content, download_name  # Emitir el contenido del archivo y el nombre de la descarga
 
 class SaveZipToGCS(beam.DoFn):
     def __init__(self, output_prefix):
         self.output_prefix = output_prefix
 
     def process(self, element):
-        content = element
-        file_path = f'{self.output_prefix}.zip'
+        content, download_name = element  # Agregar el nombre de la descarga
+        file_path = f'{self.output_prefix}/{download_name}.zip'  # Usar el nombre de la descarga en el camino del archivo
         gcs = GcsIO()
         if not gcs.exists(file_path):  # Check if file already exists
             with gcs.open(file_path, 'wb') as f:
@@ -41,22 +41,22 @@ class SaveZipToGCS(beam.DoFn):
 class ExtractZip(beam.DoFn):
     def process(self, element):
         gcs = GcsIO()
-        file_path = element
+        file_path, download_name = element  # Agregar el nombre de la descarga
         with gcs.open(file_path, 'rb') as f:
             content = f.read()
             with zipfile.ZipFile(io.BytesIO(content)) as z:
                 for zip_info in z.infolist():
                     if zip_info.filename.endswith('.txt'):
                         with z.open(zip_info) as file:
-                            yield (f"{os.path.basename(file_path)}_{zip_info.filename}", file.read())
+                            yield (file_info.filename, file.read(), download_name)  # Emitir el nombre del archivo, su contenido y el nombre de la descarga
 
 class SaveExtractedFileToGCS(beam.DoFn):
     def __init__(self, output_prefix):
         self.output_prefix = output_prefix
 
     def process(self, element):
-        file_name, content = element
-        file_path = f'{self.output_prefix}/{file_name}'
+        file_name, content, download_name = element  # Agregar el nombre de la descarga
+        file_path = f'{self.output_prefix}/{download_name}/{file_name}'  # Usar el nombre de la descarga en el camino del archivo
         gcs = GcsIO()
         with gcs.open(file_path, 'wb') as f:
             f.write(content)
