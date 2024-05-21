@@ -47,10 +47,12 @@ class ExtractZip(beam.DoFn):
             content = f.read()
             with zipfile.ZipFile(io.BytesIO(content)) as z:
                 zip_file_name = os.path.basename(file_path)  # Obtener el nombre del archivo ZIP
+                logging.info(f"ZIP file name: {zip_file_name}")  # Agregar registro para verificar el nombre del archivo ZIP
                 for zip_info in z.infolist():
                     if zip_info.filename.endswith('.txt'):
                         with z.open(zip_info) as file:
                             yield (f"{zip_file_name}_{zip_info.filename}", file.read(), zip_file_name)
+
 
 class SaveExtractedFileToGCS(beam.DoFn):
     def __init__(self, output_prefix):
@@ -64,6 +66,7 @@ class SaveExtractedFileToGCS(beam.DoFn):
         with gcs.open(file_path, 'wb') as f:
             f.write(content)
         yield file_path
+
         
 def run(argv=None):
     parser = argparse.ArgumentParser()
