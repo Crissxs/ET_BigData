@@ -19,10 +19,10 @@ class ExtractUrls(beam.DoFn):
 
 class DownloadZip(beam.DoFn):
     def process(self, element):
-        url = element
+        url, download_name = element
         response = requests.get(url)
         response.raise_for_status()
-        yield response.content
+        yield response.content, download_name.encode('utf-8')  # Codificar el nombre como bytes
 
 class SaveZipToGCS(beam.DoFn):
     def __init__(self, output_prefix):
