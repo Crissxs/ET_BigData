@@ -8,14 +8,16 @@ import os
 import json
 from apache_beam.io.gcp.gcsio import GcsIO
 import argparse
-
+import requests
 class ExtractUrls(beam.DoFn):
     def process(self, element):
-        data = json.loads(element)
+        response = requests.get("https://us-central1-duoc-bigdata-sc-2023-01-01.cloudfunctions.net/datos_transporte_et")
+        response.raise_for_status()
+        data = response.json()
         resources = data['result']['resources']
-        for resource in resources:
-            yield resource['url']
-
+        urls = [resource['url'] for resource in resources if resource['url'].endswith('.zip')]
+        for url in urls:
+            yield url
 class DownloadZip(beam.DoFn):
     def process(self, element):
         url = element
