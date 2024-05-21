@@ -12,7 +12,8 @@ import argparse
 class ExtractUrls(beam.DoFn):
         def process(self, element):
             data = json.loads(element)
-            for resource in data['result']['resources']:
+            resources = data['result']['resources']
+            for resource in resources:
                 yield resource['url']
 
 class DownloadZip(beam.DoFn):
