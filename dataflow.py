@@ -31,6 +31,7 @@ class DownloadAndExtractFiles(beam.DoFn):
         for root, _, files in os.walk('/tmp/' + folder_name):
             for file in files:
                 local_file_path = os.path.join(root, file)
+                # Construct the GCS path relative to Datos_Historicos
                 gcs_path = os.path.join('Datos_Historicos', folder_name, file)
                 blob = bucket.blob(gcs_path)
                 blob.upload_from_filename(local_file_path)
