@@ -10,10 +10,10 @@ from apache_beam.io.gcp.gcsio import GcsIO
 import argparse
 
 class ExtractUrls(beam.DoFn):
-    def process(self, element):
-        data = json.loads(element)
-        for resource in data['result']['resources']:
-            yield resource['url']
+        def process(self, element):
+            data = json.loads(element)
+            for resource in data['result']['resources']:
+                yield resource['url']
 
 class DownloadZip(beam.DoFn):
     def process(self, element):
@@ -56,12 +56,13 @@ class SaveExtractedFileToGCS(beam.DoFn):
 
     def process(self, element):
         file_name, content = element
-        file_path = f'{self.output_prefix}/{file_name}'
+        downloaded_file_name = file_name.split('_')[0]  # Extraer el nombre del archivo descargado
+        file_path = f'{self.output_prefix}/{downloaded_file_name}/{file_name}'  # Agregar el nombre del archivo descargado como una carpeta adicional
         gcs = GcsIO()
         with gcs.open(file_path, 'wb') as f:
             f.write(content)
         yield file_path
-
+        
 def run(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--output_prefix', dest='output_prefix', required=True, help='Output directory prefix to save files.')
