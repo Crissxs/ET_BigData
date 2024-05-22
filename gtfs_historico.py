@@ -8,31 +8,24 @@ import os
 from apache_beam.io.gcp.gcsio import GcsIO
 import argparse
 
-# Configuración de logging
-logging.basicConfig(level=logging.INFO)
-
 class FetchJsonFromUrl(beam.DoFn):
     def __init__(self, url):
         self.url = url
 
     def process(self, element):
-        logging.info(f"Fetching JSON data from URL: {self.url}")
         response = requests.get(self.url)
         response.raise_for_status()
         data = response.json()
         resources = data['result']['resources']
         for resource in resources:
             if resource['url'].endswith('.zip'):
-                logging.info(f"Found ZIP URL: {resource['url']}")
                 yield resource['url']
 
 class DownloadZip(beam.DoFn):
     def process(self, element):
         url = element
-        logging.info(f"Downloading ZIP file from URL: {url}")
         response = requests.get(url)
         response.raise_for_status()
-        logging.info(f"Downloaded ZIP file from URL: {url}")
         yield response.content, url  # Devolver también la URL
 
 class SaveZipToGCS(beam.DoFn):
@@ -45,10 +38,8 @@ class SaveZipToGCS(beam.DoFn):
         file_path = f'{self.output_prefix}/{file_name}'
         gcs = GcsIO()
         if not gcs.exists(file_path):  # Check if file already exists
-            logging.info(f"Saving ZIP file to GCS: {file_path}")
             with gcs.open(file_path, 'wb') as f:
                 f.write(content)
-            logging.info(f"Saved ZIP file to GCS: {file_path}")
             yield file_path
         else:
             logging.info(f"File {file_path} already exists, skipping download.")
@@ -58,18 +49,13 @@ class ExtractZip(beam.DoFn):
     def process(self, element):
         gcs = GcsIO()
         file_path = element
-        logging.info(f"Extracting ZIP file: {file_path}")
-        if gcs.exists(file_path):
-            with gcs.open(file_path, 'rb') as f:
-                content = f.read()
-                with zipfile.ZipFile(io.BytesIO(content)) as z:
-                    for zip_info in z.infolist():
-                        if zip_info.filename.endswith('.txt'):
-                            logging.info(f"Extracting file from ZIP: {zip_info.filename}")
-                            with z.open(zip_info) as file:
-                                yield (zip_info.filename, file.read(), os.path.basename(file_path))  # Solo el nombre del archivo TXT
-        else:
-            logging.error(f"ZIP file not found in GCS: {file_path}")
+        with gcs.open(file_path, 'rb') as f:
+            content = f.read()
+            with zipfile.ZipFile(io.BytesIO(content)) as z:
+                for zip_info in z.infolist():
+                    if zip_info.filename.endswith('.txt'):
+                        with z.open(zip_info) as file:
+                            yield (zip_info.filename, file.read(), os.path.basename(file_path))  # Solo el nombre del archivo TXT
 
 class SaveExtractedFileToGCS(beam.DoFn):
     def __init__(self, output_prefix):
@@ -80,10 +66,8 @@ class SaveExtractedFileToGCS(beam.DoFn):
         extracted_folder = os.path.splitext(zip_file_name)[0]  # Obtener el nombre del archivo ZIP sin la extensión
         file_path = f'{self.output_prefix}/{extracted_folder}/{file_name}'  # Usar solo el nombre del archivo TXT
         gcs = GcsIO()
-        logging.info(f"Saving extracted file to GCS: {file_path}")
         with gcs.open(file_path, 'wb') as f:
             f.write(content)
-        logging.info(f"Saved extracted file to GCS: {file_path}")
         yield file_path
 
 class DeleteZipFromGCS(beam.DoFn):
@@ -91,9 +75,8 @@ class DeleteZipFromGCS(beam.DoFn):
         gcs = GcsIO()
         file_path = element
         if gcs.exists(file_path):
-            logging.info(f"Deleting ZIP file from GCS: {file_path}")
             gcs.delete(file_path)
-            logging.info(f"Deleted ZIP file from GCS: {file_path}")
+            logging.info(f"Deleted ZIP file: {file_path}")
         yield file_path
 
 def run(argv=None):
