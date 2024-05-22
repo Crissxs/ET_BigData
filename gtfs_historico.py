@@ -121,9 +121,10 @@ def run(argv=None):
             | 'SaveZipToGCS' >> beam.ParDo(SaveZipToGCS(known_args.output_prefix))
         )
         
-        # Extraer archivos TXT de los ZIP descargados
+        # Asegurarse de que las descargas se completen antes de la extracción
         extracted_files = (
             downloaded_files
+            | 'WaitForDownloadCompletion' >> beam.Wait(downloaded_files)
             | 'ExtractZip' >> beam.ParDo(ExtractZip())
             | 'SaveExtractedFileToGCS' >> beam.ParDo(SaveExtractedFileToGCS(known_args.output_prefix))
         )
@@ -131,6 +132,7 @@ def run(argv=None):
         # Eliminar los archivos ZIP después de la extracción
         _ = (
             downloaded_files
+            | 'WaitForExtractionCompletion' >> beam.Wait(extracted_files)
             | 'DeleteZipFromGCS' >> beam.ParDo(DeleteZipFromGCS())
         )
     
