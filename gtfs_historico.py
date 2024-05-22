@@ -55,7 +55,7 @@ class ExtractZip(beam.DoFn):
                 for zip_info in z.infolist():
                     if zip_info.filename.endswith('.txt'):
                         with z.open(zip_info) as file:
-                            yield (zip_info.filename, file.read(), os.path.basename(file_path))  # Solo el nombre del archivo TXT
+                            yield (f"{os.path.basename(file_path)}_{zip_info.filename}", file.read(), os.path.basename(file_path))
 
 class SaveExtractedFileToGCS(beam.DoFn):
     def __init__(self, output_prefix):
@@ -64,7 +64,8 @@ class SaveExtractedFileToGCS(beam.DoFn):
     def process(self, element):
         file_name, content, zip_file_name = element
         extracted_folder = os.path.splitext(zip_file_name)[0]  # Obtener el nombre del archivo ZIP sin la extensión
-        file_path = f'{self.output_prefix}/{extracted_folder}/{file_name}'  # Usar solo el nombre del archivo TXT
+        extracted_file_name = os.path.basename(file_name)
+        file_path = f'{self.output_prefix}/{extracted_folder}/{extracted_file_name}'
         gcs = GcsIO()
         with gcs.open(file_path, 'wb') as f:
             f.write(content)
