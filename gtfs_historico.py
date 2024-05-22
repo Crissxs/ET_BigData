@@ -27,7 +27,7 @@ class DownloadZip(beam.DoFn):
         response = requests.get(url)
         response.raise_for_status()
         yield response.content, url  # Devolver también la URL
-        
+
 class SaveZipToGCS(beam.DoFn):
     def __init__(self, output_prefix):
         self.output_prefix = output_prefix
@@ -35,8 +35,6 @@ class SaveZipToGCS(beam.DoFn):
     def process(self, element):
         content, url = element
         file_name = os.path.basename(url)
-        if file_name.endswith('.zip'):
-            file_name = file_name[:-4]  # Eliminar la extensión ".zip"
         file_path = f'{self.output_prefix}/{file_name}'
         gcs = GcsIO()
         if not gcs.exists(file_path):  # Check if file already exists
@@ -66,13 +64,20 @@ class SaveExtractedFileToGCS(beam.DoFn):
     def process(self, element):
         file_name, content, zip_file_name = element
         extracted_folder = os.path.splitext(zip_file_name)[0]  # Obtener el nombre del archivo ZIP sin la extensión
-        file_name = os.path.basename(file_name)
-        if file_name.endswith('.txt') or file_name.endswith('.zip'):
-            file_name = file_name[:-4]  # Eliminar la extensión ".txt" o ".zip"
-        file_path = f'{self.output_prefix}/{extracted_folder}/{file_name}.txt'  # Agregar la extensión ".txt"
+        extracted_file_name = os.path.basename(file_name)
+        file_path = f'{extracted_file_name}'
         gcs = GcsIO()
         with gcs.open(file_path, 'wb') as f:
             f.write(content)
+        yield file_path
+
+class DeleteZipFromGCS(beam.DoFn):
+    def process(self, element):
+        gcs = GcsIO()
+        file_path = element
+        if gcs.exists(file_path):
+            gcs.delete(file_path)
+            logging.info(f"Deleted ZIP file: {file_path}")
         yield file_path
 
 def run(argv=None):
@@ -111,6 +116,12 @@ def run(argv=None):
             downloaded_files
             | 'ExtractZip' >> beam.ParDo(ExtractZip())
             | 'SaveExtractedFileToGCS' >> beam.ParDo(SaveExtractedFileToGCS(known_args.output_prefix))
+        )
+        
+        # Eliminar los archivos ZIP después de la extracción
+        _ = (
+            downloaded_files
+            | 'DeleteZipFromGCS' >> beam.ParDo(DeleteZipFromGCS())
         )
     
 if __name__ == '__main__':
