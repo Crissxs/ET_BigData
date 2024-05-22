@@ -114,23 +114,20 @@ def run(argv=None):
             | 'FetchJsonFromUrl' >> beam.ParDo(FetchJsonFromUrl(known_args.input_url))  # Extraer las URLs del JSON desde la URL
         )
         
-        # Descargar archivos ZIP
+        # Descargar archivos ZIP y guardarlos en GCS
         downloaded_files = (
             urls
             | 'DownloadZip' >> beam.ParDo(DownloadZip())
             | 'SaveZipToGCS' >> beam.ParDo(SaveZipToGCS(known_args.output_prefix))
         )
-
-        # Materializar la lista de archivos descargados
-        downloaded_files | 'MaterializeDownloadedFiles' >> beam.Map(lambda x: logging.info(f"Downloaded file path: {x}"))
-
+        
         # Extraer archivos TXT de los ZIP descargados
         extracted_files = (
             downloaded_files
             | 'ExtractZip' >> beam.ParDo(ExtractZip())
             | 'SaveExtractedFileToGCS' >> beam.ParDo(SaveExtractedFileToGCS(known_args.output_prefix))
         )
-
+        
         # Eliminar los archivos ZIP después de la extracción
         _ = (
             downloaded_files
