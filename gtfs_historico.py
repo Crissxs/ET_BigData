@@ -59,14 +59,17 @@ class ExtractZip(beam.DoFn):
         gcs = GcsIO()
         file_path = element
         logging.info(f"Extracting ZIP file: {file_path}")
-        with gcs.open(file_path, 'rb') as f:
-            content = f.read()
-            with zipfile.ZipFile(io.BytesIO(content)) as z:
-                for zip_info in z.infolist():
-                    if zip_info.filename.endswith('.txt'):
-                        logging.info(f"Extracting file from ZIP: {zip_info.filename}")
-                        with z.open(zip_info) as file:
-                            yield (zip_info.filename, file.read(), os.path.basename(file_path))  # Solo el nombre del archivo TXT
+        if gcs.exists(file_path):
+            with gcs.open(file_path, 'rb') as f:
+                content = f.read()
+                with zipfile.ZipFile(io.BytesIO(content)) as z:
+                    for zip_info in z.infolist():
+                        if zip_info.filename.endswith('.txt'):
+                            logging.info(f"Extracting file from ZIP: {zip_info.filename}")
+                            with z.open(zip_info) as file:
+                                yield (zip_info.filename, file.read(), os.path.basename(file_path))  # Solo el nombre del archivo TXT
+        else:
+            logging.error(f"ZIP file not found in GCS: {file_path}")
 
 class SaveExtractedFileToGCS(beam.DoFn):
     def __init__(self, output_prefix):
@@ -124,9 +127,13 @@ def run(argv=None):
             | 'SaveZipToGCS' >> beam.ParDo(SaveZipToGCS(known_args.output_prefix))
         )
         
+        # Esperar a que los archivos se guarden en GCS antes de extraerlos
+        wait_for_saving = beam.pvalue.AsList(downloaded_files)
+        
         # Extraer archivos TXT de los ZIP descargados
         extracted_files = (
-            downloaded_files
+            p
+            | 'WaitForSavedFiles' >> beam.Create(wait_for_saving)
             | 'ExtractZip' >> beam.ParDo(ExtractZip())
             | 'SaveExtractedFileToGCS' >> beam.ParDo(SaveExtractedFileToGCS(known_args.output_prefix))
         )
