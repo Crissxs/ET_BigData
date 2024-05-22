@@ -127,13 +127,9 @@ def run(argv=None):
             | 'SaveZipToGCS' >> beam.ParDo(SaveZipToGCS(known_args.output_prefix))
         )
         
-        # Esperar a que los archivos se guarden en GCS antes de extraerlos
-        wait_for_saving = beam.pvalue.AsList(downloaded_files)
-        
         # Extraer archivos TXT de los ZIP descargados
         extracted_files = (
-            p
-            | 'WaitForSavedFiles' >> beam.Create(wait_for_saving)
+            downloaded_files
             | 'ExtractZip' >> beam.ParDo(ExtractZip())
             | 'SaveExtractedFileToGCS' >> beam.ParDo(SaveExtractedFileToGCS(known_args.output_prefix))
         )
